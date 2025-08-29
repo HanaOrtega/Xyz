@@ -1,0 +1,247 @@
+paths:
+  base_output_directory: wyniki_dla_symboli
+  model_save_directory: zapisane_modele
+  plots_directory: wykresy
+  tuner_directory: tuner_dir
+data:
+  symbol: GOOGL
+  data_start: '1900-01-01'
+  data_end: '2025-07-30'
+  validation_set_size: 0.15
+  test_set_size: 0.15
+  sekwencja_dlugosc: 30
+  horyzont_predykcji: 14
+default_cnnlstm_params:
+  use_cnn_block: true
+  cnn_filters: [64, 128]
+  cnn_kernel_sizes: [5, 3]
+  cnn_pool_sizes: [2, 1]
+  n_units: 128
+  n_recurrent_layers: 2
+  use_bidirectional: true
+  use_attention: false
+  dropout_rate: 0.3
+  learning_rate: 0.0005
+features:
+  metoda_skalowania_danych: minmax
+  feature_selection_method: rfe
+  liczba_wybranych_cech: 30
+  tft_known_future_features:
+  - day_of_week
+  - month
+  - day_of_year
+  - week_of_year
+
+
+advanced_feature_engineering:
+  enabled: true
+  hurst_exponent:
+    enabled: true
+    window: 100 # Okno dla średniej kroczącej (w dniach)
+  fractal_dimension:
+    enabled: true
+    window: 100 # Okno dla średniej kroczącej (w dniach)
+  candlestick_anatomy:
+    enabled: true
+training:
+  epochs: 200
+  batch_size: 32
+  use_keras_tuner: true
+  tuner_hp_ranges:
+    cnnlstm:
+      n_units: {min_value: 64, max_value: 192, step: 32}
+      n_recurrent_layers: {min_value: 1, max_value: 3, step: 1}
+    rnn:
+      n_units: {min_value: 64, max_value: 192, step: 32}
+      n_recurrent_layers: {min_value: 2, max_value: 4, step: 1}
+    transformer:
+      num_transformer_blocks: {min_value: 2, max_value: 6, step: 1}
+      d_model: {values: [64, 128]}
+      num_heads: {values: [4, 8]}
+      ff_dim: {min_value: 128, max_value: 512, step: 128}
+    tft:
+      d_model: {values: [32, 64, 96]}
+      num_heads: {values: [2, 4]}
+      dropout_rate: {min_value: 0.1, max_value: 0.3, step: 0.1}
+    learning_rate: [0.001, 0.0005, 0.0001]
+    dropout_rate: {min_value: 0.15, max_value: 0.4, step: 0.05}
+  use_fine_tuning: true
+  fine_tuning_period_months: 4
+  fine_tuning_epochs: 30
+  fine_tuning_lr_multiplier: 0.1
+  use_optuna: true
+  optuna_max_trials: 10
+  use_early_stopping: true
+  early_stopping_patience: 20
+  early_stopping_restore_best: true
+  use_lr_scheduling: true
+  lr_schedule_patience: 10
+  use_model_checkpoint: true
+  use_sample_weighting: true
+  sample_weight_decay: 0.999
+  augmentacja_danych: # Zastąp 'augmentacja_szum'
+    enabled: true
+    method: 'noise' # Dostępne opcje: 'noise', 'bootstrap'
+    noise_level: 0.005
+    bootstrap_multiplier: 2 # Ile razy powiększyć zbiór (np. 2 = podwójna liczba próbek)
+  noise_level: 0.005
+  fit_verbose: 1
+hyperparameter_tuning:
+  enabled: true # Ustaw na 'true', aby aktywować rozszerzone przeszukiwanie
+  search_space:
+    # Lista metod skalowania, które tuner może wybrać
+    scaling_methods:
+      - "minmax"
+      - "standard"
+      - "robust"
+
+    # Lista metod selekcji cech do przetestowania
+    feature_selection_methods:
+      - "rfe"
+      - "correlation"
+      - "mutual_information"
+      - "shap"
+date_selection:
+  enabled: true
+  method: probe
+  probe_method: auto
+  probe_optimization_metric: dir_acc
+  manual_candidate_years: [2, 3]
+  evaluation_period_months: 6
+  auto_volatility_window: 30
+  auto_num_regimes_to_find: 5
+  auto_pelt_penalty: 10
+  auto_max_regime_years: 7
+  auto_max_age_years: 15
+evaluation_strategy:
+  method: walk_forward
+  num_splits: 2
+prediction_target_type: log_returns
+loss_function_settings:
+  name: mse
+  directional_penalty_weight: 2.5
+sentiment_analysis:
+  enabled: true
+  news_api_key: db1e645ae744b2947e1cc04f52f86f # Wskazówka: Warto przenieść ten klucz do zmiennej środowiskowej
+  ollama_model: phi3:mini
+ensemble_settings:
+  stacking_meta_model_type: lightgbm
+  stacking_param_grid_lgbm:
+    estimator__n_estimators: [100, 200]
+    estimator__learning_rate: [0.05, 0.1]
+    estimator__num_leaves: [20, 31]
+target_column: close
+nazwa_modelu: model_kompletny_test
+random_state: 42
+enable_incremental_learning: true
+models_to_tune:
+#- TRANSFORMER
+#- GRU
+#- LSTM
+#- CNN-LSTM
+#- TFT
+- JIGGLYPUFF
+# NOWA SEKCJA: Ustawienia dla potoku Jigglypuff 2.0
+jigglypuff_settings:
+  # Włącza nowy potok oparty na NAS
+  nas_enabled: true
+  # Dostępne tryby:
+  # 'nas_architect': (NOWY) Jigglypuff sam projektuje i buduje model od zera. Nie wymaga innych modeli.
+  # 'analyst': (STARY) Jigglypuff analizuje wyniki wcześniej wytrenowanych modeli (LSTM, GRU, etc.).
+  mode: 'nas_architect'
+  # Ile różnych architektur ma przetestować Optuna?
+  nas_trials: 30
+  # Ile najlepszych, unikalnych architektur użyć do budowy Nauczyciela?
+  top_n_blueprints_for_teacher: 3
+  # "Menu" komponentów dla architekta AI
+  nas_search_space:
+    feature_extractor_choices: ["cnn", "none"]
+    num_paths: [1, 2] # Ile równoległych ścieżek przetwarzania sekwencji
+    path_processor_choices: ["lstm", "gru", "transformer"]
+    merge_strategy_choices: ["add", "concatenate"]
+    output_head_choices: ["dense", "garch_probabilistic"]
+fetch_sp500: true
+dodaj_cechy_czasowe: true
+cykliczne_cechy_czasowe: true
+price_diff_periods: [1, 2, 3, 5, 7, 10]
+volatility_periods: [7, 10, 30, 60]
+use_talib_indicators: true
+prediction_mode: probabilistic
+optimizer_settings:
+  tuner: keras
+  optuna_trials: 10
+  kt_max_trials: 10
+  sklearn_search_iterations: 10
+  optuna_storage_db: sqlite:///optuna_studies.db
+  optuna_study_name_prefix: fin_forecast
+default_rnn_params:
+  n_units: 128
+  n_recurrent_layers: 3
+  use_bidirectional: true
+  use_attention: true
+  attention_type: multihead
+  mha_num_heads_rnn: 4
+  use_cnn_block: true
+  cnn_filters: [64, 128]
+  cnn_kernel_sizes: [5, 3]
+  cnn_pool_sizes: [2, 1]
+  dropout_rate: 0.25
+  learning_rate: 0.0005
+default_transformer_params:
+  num_transformer_blocks: 4
+  d_model: 128
+  num_heads: 8
+  ff_dim: 256
+  dropout_rate: 0.2
+  learning_rate: 0.0005
+default_rf_params:
+  n_estimators: 300
+  max_depth: 25
+  min_samples_split: 10
+  min_samples_leaf: 5
+  max_features: sqrt
+  verbose: 1
+default_xgb_params:
+  n_estimators: 500
+  max_depth: 7
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+  objective: reg:squarederror
+  verbosity: 1
+use_rf_tuner: true
+rf_tuner_iterations: 40
+rf_cv_splits: 5
+rf_param_grid:
+  n_estimators: [200, 600]
+  max_depth: [15, 40]
+  min_samples_split: [5, 20]
+  min_samples_leaf: [3, 10]
+  max_features: [sqrt, 0.7, 0.8]
+use_xgb_tuner: true
+xgb_tuner_iterations: 40
+xgb_cv_splits: 5
+xgb_param_grid:
+  n_estimators: [300, 1000]
+  max_depth: [5, 12]
+  learning_rate: [0.01, 0.1]
+  subsample: [0.7, 1.0]
+  colsample_bytree: [0.7, 1.0]
+early_stopping_patience_tuner: 15
+lr_schedule_min_lr: 1.0e-07
+default_tft_params:
+  tft_d_model: 64
+  tft_num_heads: 4
+  tft_dropout_rate: 0.15
+  tft_num_encoder_steps: 2
+  learning_rate: 0.001
+keras_tuner_max_trials: 10
+force_retune: true
+enable_resource_monitoring: true
+rfe_estimator_params:
+  n_estimators: 50
+  max_depth: 10
+  n_jobs: -1
+data_validation:
+  enable_drift_detection: true
+  drift_detection_threshold: 0.05 # Próg p-value dla testu K-S
